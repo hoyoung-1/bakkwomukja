@@ -1,0 +1,24 @@
+# 패키지 폴더 (npm install로 자동 생성되므로 올리지 않음)
+node_modules/
+
+# Expo 빌드 결과물
+.expo/
+dist/
+web-build/
+
+# 환경 변수 (비밀키 등 민감한 정보)
+.env
+.env.local
+
+# OS 자동 생성 파일
+.DS_Store
+Thumbs.db
+
+# 에디터 설정
+.vscode/
+.idea/
+
+# 로그
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
