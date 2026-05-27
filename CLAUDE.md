@@ -9,11 +9,23 @@ React Native (Expo) 기반, 안드로이드(갤럭시 S23 울트라) 최적화.
 - GitHub: https://github.com/hoyoung-1/bakkwomukja
 
 ## 기술 스택
-- **프레임워크**: React Native (Expo ~52)
+- **프레임워크**: React Native (Expo ~54) + React 19 + RN 0.81.5
 - **네비게이션**: React Navigation v6 (Stack + BottomTabs)
 - **상태 관리**: Context API + useReducer
 - **로컬 저장소**: AsyncStorage
 - **언어**: JavaScript (JSX)
+
+## 주요 패키지 버전 (SDK 54 기준)
+```json
+"expo": "~54.0.0",
+"react": "19.1.0",
+"react-native": "0.81.5",
+"expo-status-bar": "~2.2.3",
+"react-native-screens": "~4.16.0",
+"react-native-safe-area-context": "~5.6.0",
+"@react-native-async-storage/async-storage": "^2.1.0"
+```
+> ⚠️ Expo Go 앱은 **SDK 54** 버전 필요 (Play Store에서 최신 버전 설치)
 
 ## 완성된 화면 및 기능
 
@@ -82,10 +94,13 @@ React Native (Expo) 기반, 안드로이드(갤럭시 S23 울트라) 최적화.
 
 ## 앱 실행 방법
 ```bash
-npm install          # 패키지 설치 (최초 1회)
-npx expo start --android
+npm install --legacy-peer-deps   # 패키지 설치 (최초 1회)
+npx expo start --lan             # 같은 와이파이 환경에서 실행
 ```
-폰에 Expo Go 앱 설치 후 QR 스캔으로 실기기 테스트 가능.
+- 폰에 **Expo Go** 앱 설치 후 QR 스캔으로 실기기 테스트 가능
+- PC와 폰이 **같은 와이파이**에 연결되어야 함
+- 터미널을 끄면 앱 연결이 끊김 (개발 서버 방식)
+- `--legacy-peer-deps` 옵션 필수 (React 19 peer dep 충돌 우회)
 
 ## 폴더 구조
 ```
