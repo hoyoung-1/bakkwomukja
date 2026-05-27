@@ -14,25 +14,32 @@ npm install -g expo-cli
 
 ### 2단계: 패키지 설치
 ```bash
-cd 바꿔먹자
-npm install
+cd bakkwomukja
+npm install --legacy-peer-deps
 ```
 
-> ⚠️ 버전 충돌이 나면 아래 명령어로 Expo 호환 버전으로 자동 맞춰줌:
+> ⚠️ `--legacy-peer-deps` 옵션 필수 (React 19 peer dependency 충돌 우회)
+>
+> 버전 충돌이 나면 아래 명령어로 Expo 호환 버전으로 자동 맞춰줌:
 > ```bash
 > npx expo install --fix
 > ```
 
 ### 3단계: 앱 실행
 ```bash
-npm start
-# 또는
-npx expo start --android
+npx expo start --lan
 ```
 
+> 💡 옵션별 차이:
+> - `--lan` : 같은 와이파이에서 QR코드로 실기기 연결 (**Expo Go 사용 시 권장**)
+> - `--tunnel` : 회사/공용 와이파이로 LAN이 막힐 때 우회 (느림)
+> - `--android` : Android Studio + adb 설치된 환경에서 에뮬레이터/USB 기기 직접 실행
+
 ### 4단계: 기기에서 실행
-- **안드로이드 실기기**: Play Store에서 "Expo Go" 앱 설치 후 QR코드 스캔
-- **에뮬레이터**: Android Studio에서 에뮬레이터 실행 후 `a` 키 누르기
+- **안드로이드 실기기 (권장)**: Play Store에서 "Expo Go" 앱 설치 → 터미널의 QR코드 스캔
+  - PC와 폰이 **같은 와이파이**에 연결되어 있어야 함
+  - Expo Go는 **SDK 54 호환 버전** 필요
+- **에뮬레이터**: Android Studio 설치 후 에뮬레이터 실행 → 터미널에서 `a` 키 누르기
 
 ---
 
