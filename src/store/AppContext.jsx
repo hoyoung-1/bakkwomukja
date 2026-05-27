@@ -24,10 +24,22 @@ import { calculateCompletion, isGoalAchieved } from '../utils/calculations';
 
 // ── AsyncStorage에 저장할 때 쓰는 키 이름들 ─────────────────────
 const STORAGE_KEYS = {
-  PROFILE: '@bkj_profile',
-  GOALS:   '@bkj_goals',
-  INTAKE:  '@bkj_intake',   // 오늘 하루치 섭취량
-  HISTORY: '@bkj_history',  // 날짜별 달성 기록 전체
+  PROFILE:   '@bkj_profile',
+  GOALS:     '@bkj_goals',
+  INTAKE:    '@bkj_intake',     // 오늘 하루치 섭취량
+  HISTORY:   '@bkj_history',    // 날짜별 달성 기록 전체
+  GLUCOSE:   '@bkj_glucose',    // 혈당 기록 배열
+  REMINDERS: '@bkj_reminders',  // 식사 알림 설정
+};
+
+// ── 식사 알림 기본값 (아침 8시 · 점심 12시 · 저녁 18시) ─────────
+const DEFAULT_MEAL_REMINDERS = {
+  enabled: false,
+  times: {
+    breakfast: '08:00',
+    lunch:     '12:00',
+    dinner:    '18:00',
+  },
 };
 
 // ── 앱이 처음 켜졌을 때의 기본 상태값 ───────────────────────────
@@ -55,6 +67,13 @@ const initialState = {
   },
 
   history: {},  // { "2026-05-27": { achieved: true, completion: 1.0, intake: {...} } }
+
+  // 혈당 기록 (최신순 정렬, 최대 200건 유지)
+  // 항목: { id, timestamp, value, type, memo }
+  //   type: 'fasting' | 'preMeal' | 'postMeal' | 'bedtime'
+  glucoseRecords: [],
+
+  mealReminders: DEFAULT_MEAL_REMINDERS,
 };
 
 // ── 리듀서: 액션 종류에 따라 상태를 어떻게 바꿀지 정의 ──────────
@@ -125,6 +144,32 @@ function reducer(state, action) {
       };
     }
 
+    // 혈당 기록 1건 추가 (최신순으로 앞에 삽입, 최대 200건)
+    case ACTIONS.ADD_GLUCOSE: {
+      const next = [action.payload, ...state.glucoseRecords].slice(0, 200);
+      return { ...state, glucoseRecords: next };
+    }
+
+    // 혈당 기록 1건 삭제 (id 기준)
+    case ACTIONS.DELETE_GLUCOSE: {
+      const id = action.payload;
+      return {
+        ...state,
+        glucoseRecords: state.glucoseRecords.filter((r) => r.id !== id),
+      };
+    }
+
+    // 식사 알림 설정 업데이트
+    case ACTIONS.SET_MEAL_REMINDERS:
+      return {
+        ...state,
+        mealReminders: {
+          ...state.mealReminders,
+          ...action.payload,
+          times: { ...state.mealReminders.times, ...(action.payload.times ?? {}) },
+        },
+      };
+
     default:
       return state;
   }
@@ -159,21 +204,33 @@ export function AppProvider({ children }) {
     if (!state.isLoading) saveToStorage(STORAGE_KEYS.HISTORY, state.history);
   }, [state.history, state.isLoading]);
 
+  useEffect(() => {
+    if (!state.isLoading) saveToStorage(STORAGE_KEYS.GLUCOSE, state.glucoseRecords);
+  }, [state.glucoseRecords, state.isLoading]);
+
+  useEffect(() => {
+    if (!state.isLoading) saveToStorage(STORAGE_KEYS.REMINDERS, state.mealReminders);
+  }, [state.mealReminders, state.isLoading]);
+
   // ── AsyncStorage 읽기 ─────────────────────────────────────────
   const loadAllData = async () => {
     try {
-      const [profileStr, goalsStr, intakeStr, historyStr] = await Promise.all([
+      const [profileStr, goalsStr, intakeStr, historyStr, glucoseStr, remindersStr] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.PROFILE),
         AsyncStorage.getItem(STORAGE_KEYS.GOALS),
         AsyncStorage.getItem(STORAGE_KEYS.INTAKE),
         AsyncStorage.getItem(STORAGE_KEYS.HISTORY),
+        AsyncStorage.getItem(STORAGE_KEYS.GLUCOSE),
+        AsyncStorage.getItem(STORAGE_KEYS.REMINDERS),
       ]);
 
       const today          = getTodayKey();
-      const savedProfile   = profileStr  ? JSON.parse(profileStr)  : null;
-      const savedGoals     = goalsStr    ? JSON.parse(goalsStr)    : DEFAULT_GOALS;
-      let   savedIntake    = intakeStr   ? JSON.parse(intakeStr)   : null;
-      const savedHistory   = historyStr  ? JSON.parse(historyStr)  : {};
+      const savedProfile   = profileStr   ? JSON.parse(profileStr)   : null;
+      const savedGoals     = goalsStr     ? JSON.parse(goalsStr)     : DEFAULT_GOALS;
+      let   savedIntake    = intakeStr    ? JSON.parse(intakeStr)    : null;
+      const savedHistory   = historyStr   ? JSON.parse(historyStr)   : {};
+      const savedGlucose   = glucoseStr   ? JSON.parse(glucoseStr)   : [];
+      const savedReminders = remindersStr ? JSON.parse(remindersStr) : DEFAULT_MEAL_REMINDERS;
 
       // ── 날짜가 바뀌었으면 (자정을 지났으면): 어제 기록 저장 후 초기화
       if (savedIntake && savedIntake.date !== today) {
@@ -202,10 +259,12 @@ export function AppProvider({ children }) {
       dispatch({
         type: ACTIONS.LOAD_ALL_DATA,
         payload: {
-          profile:     savedProfile ?? initialState.profile,
-          goals:       savedGoals,
-          todayIntake: savedIntake ?? { date: today, grain: 0, protein: 0, vegetable: 0, fat: 0, milk: 0, fruit: 0 },
-          history:     savedHistory,
+          profile:        savedProfile ?? initialState.profile,
+          goals:          savedGoals,
+          todayIntake:    savedIntake ?? { date: today, grain: 0, protein: 0, vegetable: 0, fat: 0, milk: 0, fruit: 0 },
+          history:        savedHistory,
+          glucoseRecords: savedGlucose,
+          mealReminders:  { ...DEFAULT_MEAL_REMINDERS, ...savedReminders, times: { ...DEFAULT_MEAL_REMINDERS.times, ...(savedReminders.times ?? {}) } },
         },
       });
 

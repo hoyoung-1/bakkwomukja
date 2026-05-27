@@ -8,6 +8,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import HistoryScreen   from '../screens/HistoryScreen';
+import GlucoseScreen   from '../screens/GlucoseScreen';
 import SettingsScreen  from '../screens/SettingsScreen';
 import { COLORS, FONTS, SPACING } from '../constants/theme';
 
@@ -53,6 +54,15 @@ export default function MainTabNavigator() {
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon emoji="📅" label="달력" focused={focused} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Glucose"
+        component={GlucoseScreen}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon emoji="🩸" label="혈당" focused={focused} />
           ),
         }}
       />

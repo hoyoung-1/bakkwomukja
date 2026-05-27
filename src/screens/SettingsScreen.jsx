@@ -5,9 +5,9 @@
 // 저장 시 Alert으로 새 계산 결과를 보여주고 확인받음
 // ─────────────────────────────────────────────────────────────────
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
+  View, Text, TextInput, TouchableOpacity, Switch,
   ScrollView, StyleSheet, SafeAreaView, Alert,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
@@ -21,6 +21,17 @@ import {
   calculateDailyCalories,
   calculateGoals,
 } from '../utils/calculations';
+import {
+  ensureNotificationPermission,
+  rescheduleMealReminders,
+} from '../utils/notifications';
+
+const TIME_REGEX = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+const MEAL_DEFS = [
+  { key: 'breakfast', emoji: '🌅', label: '아침' },
+  { key: 'lunch',     emoji: '🍱', label: '점심' },
+  { key: 'dinner',    emoji: '🍽️', label: '저녁' },
+];
 
 const ACTIVITY_OPTIONS = [
   { value: 'light',    label: '가벼운\n활동', emoji: '🚶' },
@@ -37,6 +48,15 @@ export default function SettingsScreen() {
   const [weight,        setWeight]        = useState(String(state.profile.weight));
   const [activityLevel, setActivityLevel] = useState(state.profile.activityLevel);
   const [errors,        setErrors]        = useState({});
+
+  // ── 식사 알림 로컬 상태 (저장하면 시스템 알림 재예약) ────────
+  const [mealTimes, setMealTimes] = useState(state.mealReminders.times);
+  const reminderEnabled           = state.mealReminders.enabled;
+
+  // 외부에서 mealReminders가 바뀌면(다른 화면에서 dispatch 등) 입력 칸도 동기화
+  useEffect(() => {
+    setMealTimes(state.mealReminders.times);
+  }, [state.mealReminders.times]);
 
   // 현재 저장된 표준체중 (표시용)
   const currentStdWeight = calculateStandardWeight(
@@ -57,6 +77,60 @@ export default function SettingsScreen() {
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  // ── 식사 알림: 토글 ───────────────────────────────────────────
+  const handleToggleReminder = async (next) => {
+    if (next) {
+      const ok = await ensureNotificationPermission();
+      if (!ok) {
+        Alert.alert(
+          '알림 권한 필요',
+          '식사 알림을 받으려면 시스템 설정에서 이 앱의 알림을 허용해주세요.',
+        );
+        return;
+      }
+      // 입력된 시간 유효성 검사
+      const invalid = MEAL_DEFS.find((m) => !TIME_REGEX.test(mealTimes[m.key]));
+      if (invalid) {
+        Alert.alert('시간 형식 오류', `${invalid.label} 시간을 HH:MM 형식으로 입력해주세요.`);
+        return;
+      }
+      const payload = { enabled: true, times: mealTimes };
+      dispatch({ type: ACTIONS.SET_MEAL_REMINDERS, payload });
+      await rescheduleMealReminders({ ...state.mealReminders, ...payload });
+      Alert.alert('🔔 알림 켜짐', `아침 ${mealTimes.breakfast} · 점심 ${mealTimes.lunch} · 저녁 ${mealTimes.dinner} 에 알려드릴게요.`);
+    } else {
+      dispatch({ type: ACTIONS.SET_MEAL_REMINDERS, payload: { enabled: false } });
+      await rescheduleMealReminders({ ...state.mealReminders, enabled: false });
+    }
+  };
+
+  // ── 식사 알림: 시간 변경 후 즉시 재예약 ──────────────────────
+  const handleTimeChange = (key, raw) => {
+    // 숫자만 받아서 자동으로 콜론 삽입 (HHMM → HH:MM)
+    const digits = raw.replace(/[^0-9]/g, '').slice(0, 4);
+    const formatted = digits.length >= 3
+      ? `${digits.slice(0, 2)}:${digits.slice(2)}`
+      : digits;
+    setMealTimes((prev) => ({ ...prev, [key]: formatted }));
+  };
+
+  const handleSaveReminderTimes = async () => {
+    const invalid = MEAL_DEFS.find((m) => !TIME_REGEX.test(mealTimes[m.key]));
+    if (invalid) {
+      Alert.alert('시간 형식 오류', `${invalid.label} 시간을 HH:MM 형식으로 입력해주세요.`);
+      return;
+    }
+    const payload = { times: mealTimes };
+    dispatch({ type: ACTIONS.SET_MEAL_REMINDERS, payload });
+
+    if (reminderEnabled) {
+      await rescheduleMealReminders({ ...state.mealReminders, ...payload });
+      Alert.alert('✅ 알림 시간 업데이트', `아침 ${mealTimes.breakfast} · 점심 ${mealTimes.lunch} · 저녁 ${mealTimes.dinner}`);
+    } else {
+      Alert.alert('저장됨', '알림이 꺼져 있어요. 토글을 켜면 적용됩니다.');
+    }
   };
 
   // ── 저장 ───────────────────────────────────────────────────────
@@ -250,6 +324,53 @@ export default function SettingsScreen() {
           >
             <Text style={styles.saveBtnText}>목표 재계산 및 저장 💾</Text>
           </TouchableOpacity>
+
+          {/* ── 식사 알림 섹션 ──────────────────────────────── */}
+          <Text style={[styles.sectionTitle, { marginTop: SPACING.xl }]}>식사 알림 🔔</Text>
+
+          <View style={styles.reminderCard}>
+            <View style={styles.reminderToggleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.reminderToggleLabel}>매일 식사 시간 알림</Text>
+                <Text style={styles.reminderToggleHint}>
+                  앱이 꺼져 있어도 알려드려요
+                </Text>
+              </View>
+              <Switch
+                value={reminderEnabled}
+                onValueChange={handleToggleReminder}
+                trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
+                thumbColor={reminderEnabled ? COLORS.primary : COLORS.textLight}
+              />
+            </View>
+
+            <View style={styles.reminderDivider} />
+
+            {MEAL_DEFS.map((m) => (
+              <View key={m.key} style={styles.timeRow}>
+                <Text style={styles.timeLabel}>
+                  {m.emoji}  {m.label}
+                </Text>
+                <TextInput
+                  style={styles.timeInput}
+                  value={mealTimes[m.key]}
+                  onChangeText={(t) => handleTimeChange(m.key, t)}
+                  keyboardType="numeric"
+                  maxLength={5}
+                  placeholder="HH:MM"
+                  placeholderTextColor={COLORS.textLight}
+                />
+              </View>
+            ))}
+
+            <TouchableOpacity
+              style={styles.reminderSaveBtn}
+              onPress={handleSaveReminderTimes}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.reminderSaveBtnText}>알림 시간 저장</Text>
+            </TouchableOpacity>
+          </View>
 
           <View style={{ height: SPACING.xxl }} />
         </ScrollView>
@@ -460,6 +581,74 @@ const styles = StyleSheet.create({
   },
   saveBtnText: {
     fontSize:   FONTS.sizes.lg,
+    fontWeight: FONTS.weights.bold,
+    color:      COLORS.white,
+  },
+
+  // ── 식사 알림 카드
+  reminderCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius:    BORDER_RADIUS.lg,
+    padding:         SPACING.lg,
+    shadowColor:     '#000',
+    shadowOffset:    { width: 0, height: 2 },
+    shadowOpacity:   0.08,
+    shadowRadius:    6,
+    elevation:       3,
+  },
+  reminderToggleRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+  },
+  reminderToggleLabel: {
+    fontSize:   FONTS.sizes.md,
+    fontWeight: FONTS.weights.bold,
+    color:      COLORS.text,
+  },
+  reminderToggleHint: {
+    fontSize:  FONTS.sizes.xs,
+    color:     COLORS.textSecondary,
+    marginTop: 2,
+  },
+  reminderDivider: {
+    height:          1,
+    backgroundColor: COLORS.border,
+    marginVertical:  SPACING.md,
+  },
+  timeRow: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'space-between',
+    marginBottom:    SPACING.sm,
+  },
+  timeLabel: {
+    fontSize:   FONTS.sizes.md,
+    fontWeight: FONTS.weights.medium,
+    color:      COLORS.text,
+  },
+  timeInput: {
+    width:             100,
+    height:            TOUCH_TARGET.comfortable,
+    backgroundColor:   COLORS.background,
+    borderWidth:       2,
+    borderColor:       COLORS.border,
+    borderRadius:      BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    fontSize:          FONTS.sizes.lg,
+    fontWeight:        FONTS.weights.bold,
+    color:             COLORS.text,
+    textAlign:         'center',
+  },
+  reminderSaveBtn: {
+    height:          TOUCH_TARGET.comfortable,
+    backgroundColor: COLORS.accent,
+    borderRadius:    BORDER_RADIUS.md,
+    justifyContent:  'center',
+    alignItems:      'center',
+    marginTop:       SPACING.md,
+  },
+  reminderSaveBtnText: {
+    fontSize:   FONTS.sizes.md,
     fontWeight: FONTS.weights.bold,
     color:      COLORS.white,
   },

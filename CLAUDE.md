@@ -20,7 +20,8 @@ React Native (Expo) 기반, 안드로이드(갤럭시 S23 울트라) 최적화.
 "expo": "~54.0.0",
 "react": "19.1.0",
 "react-native": "0.81.5",
-"expo-status-bar": "~2.2.3",
+"expo-status-bar": "~3.0.9",
+"expo-notifications": "~0.32.17",
 "react-native-screens": "~4.16.0",
 "react-native-safe-area-context": "~5.6.0",
 "@react-native-async-storage/async-storage": "^2.1.0"
@@ -35,13 +36,15 @@ React Native (Expo) 기반, 안드로이드(갤럭시 S23 울트라) 최적화.
 | 온보딩 (신체정보 입력 + 교환단위 자동 계산) | `src/screens/OnboardingScreen.jsx` |
 | 메인 대시보드 (캐릭터 + 6개 카운터) | `src/screens/DashboardScreen.jsx` |
 | 성공 달력 (🐾 도장, % 부분달성 표시) | `src/screens/HistoryScreen.jsx` |
-| 설정 화면 (목표 재계산) | `src/screens/SettingsScreen.jsx` |
+| 혈당 기록 탭 (수치 입력 + 측정시점별 상태 색상) | `src/screens/GlucoseScreen.jsx` |
+| 설정 화면 (목표 재계산 + 식사 알림 설정) | `src/screens/SettingsScreen.jsx` |
 | [+][-] 0.5단위 카운터 버튼 | `src/components/common/CounterButton.jsx` |
 | 진행 바 (달성시 오렌지 전환) | `src/components/common/ProgressBar.jsx` |
 | 캐릭터 무대 (4단계: 🤒→😔→😊→✨🐶✨) | `src/components/dashboard/CharacterStage.jsx` |
 | 식품군 행 (이모지+이름+진행바+버튼) | `src/components/dashboard/FoodGroupRow.jsx` |
 | 자정 자동 리셋 훅 | `src/hooks/useDailyReset.js` |
 | 전역 상태 관리 | `src/store/AppContext.jsx` |
+| 식사 알림 (로컬 푸시, 매일 반복) | `src/utils/notifications.js` |
 
 ## 핵심 데이터 구조 (AppContext state)
 ```javascript
@@ -77,7 +80,24 @@ React Native (Expo) 기반, 안드로이드(갤럭시 S23 울트라) 최적화.
       completion: number, // 0.0 ~ 1.0
       intake: { grain, protein, vegetable, fat, milk, fruit }
     }
-  }
+  },
+  glucoseRecords: [          // 최신순, 최대 200건
+    {
+      id: string,            // "g_<ts>_<rand>"
+      timestamp: string,     // ISO 8601
+      value: number,         // mg/dL (20~600)
+      type: 'fasting' | 'preMeal' | 'postMeal' | 'bedtime',
+      memo: string,
+    }
+  ],
+  mealReminders: {
+    enabled: boolean,
+    times: {
+      breakfast: string,     // "HH:MM"
+      lunch:     string,
+      dinner:    string,
+    },
+  },
 }
 ```
 
@@ -118,9 +138,9 @@ src/
 
 ## 향후 개발 예정 (미구현)
 - [ ] 픽셀 아트 캐릭터 이미지 교체 (현재 이모지로 대체)
-- [ ] 혈당 기록 탭
+- [x] 혈당 기록 탭 — `src/screens/GlucoseScreen.jsx`
 - [ ] 음식 검색 → 자동 교환단위 환산
-- [ ] 식사 알림 푸시 알림 (expo-notifications)
+- [x] 식사 알림 푸시 알림 (expo-notifications) — `src/utils/notifications.js`, 설정 화면 토글
 - [ ] 앱 아이콘 / 스플래시 스크린 디자인
 
 ## 코딩 스타일 & 주의사항
@@ -128,4 +148,6 @@ src/
 - 터치 영역: `minHeight: 72` (S23 울트라 기준)
 - 0.5단위 증감: `Math.round((value + delta) * 10) / 10` (부동소수점 오류 방지)
 - 상태 변경: 반드시 dispatch + ACTIONS 상수 사용
-- AsyncStorage 키: `@bkj_profile`, `@bkj_goals`, `@bkj_intake`, `@bkj_history`
+- AsyncStorage 키: `@bkj_profile`, `@bkj_goals`, `@bkj_intake`, `@bkj_history`, `@bkj_glucose`, `@bkj_reminders`
+- 알림은 **로컬 알림** (`expo-notifications`의 DAILY trigger). Expo Go에서도 동작하나 Android는 채널 `meal-reminder` 사용
+- 알림 시간 변경 시 `rescheduleMealReminders()` 호출로 기존 예약 취소 후 재예약

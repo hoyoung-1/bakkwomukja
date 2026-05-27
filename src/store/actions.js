@@ -24,4 +24,13 @@ export const ACTIONS = {
 
   /** 특정 날짜의 달성 기록을 히스토리에 저장 */
   SAVE_HISTORY_ENTRY: 'SAVE_HISTORY_ENTRY',
+
+  /** 혈당 기록 1건 추가 */
+  ADD_GLUCOSE: 'ADD_GLUCOSE',
+
+  /** 혈당 기록 1건 삭제 (id 기준) */
+  DELETE_GLUCOSE: 'DELETE_GLUCOSE',
+
+  /** 식사 알림 설정 업데이트 (enabled / times) */
+  SET_MEAL_REMINDERS: 'SET_MEAL_REMINDERS',
 };
