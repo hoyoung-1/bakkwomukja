@@ -5,15 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "icon": "./assets/icon.png",
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#F5F5F0"
-    },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#F5F5F0"
-      },
       "package": "com.bakkwomukja.app",
       "softwareKeyboardLayoutMode": "pan"
     },
